@@ -14,16 +14,305 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_log: {
+        Row: {
+          action: string
+          changed_by: string
+          created_at: string
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_by: string
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      requests: {
+        Row: {
+          category: Database["public"]["Enums"]["request_category"] | null
+          classified_at: string | null
+          classified_by: string | null
+          created_at: string
+          date_received: string
+          description: string
+          id: string
+          impact: string
+          is_deleted: boolean
+          request_type: Database["public"]["Enums"]["request_category"] | null
+          size_estimate: string | null
+          source_customer: string
+          sprint_id: string | null
+          status: Database["public"]["Enums"]["request_status"]
+          submitter_id: string
+          title: string
+          updated_at: string
+          urgency: Database["public"]["Enums"]["request_urgency"]
+          workaround: string | null
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["request_category"] | null
+          classified_at?: string | null
+          classified_by?: string | null
+          created_at?: string
+          date_received?: string
+          description: string
+          id?: string
+          impact: string
+          is_deleted?: boolean
+          request_type?: Database["public"]["Enums"]["request_category"] | null
+          size_estimate?: string | null
+          source_customer: string
+          sprint_id?: string | null
+          status?: Database["public"]["Enums"]["request_status"]
+          submitter_id: string
+          title: string
+          updated_at?: string
+          urgency?: Database["public"]["Enums"]["request_urgency"]
+          workaround?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["request_category"] | null
+          classified_at?: string | null
+          classified_by?: string | null
+          created_at?: string
+          date_received?: string
+          description?: string
+          id?: string
+          impact?: string
+          is_deleted?: boolean
+          request_type?: Database["public"]["Enums"]["request_category"] | null
+          size_estimate?: string | null
+          source_customer?: string
+          sprint_id?: string | null
+          status?: Database["public"]["Enums"]["request_status"]
+          submitter_id?: string
+          title?: string
+          updated_at?: string
+          urgency?: Database["public"]["Enums"]["request_urgency"]
+          workaround?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requests_sprint_id_fkey"
+            columns: ["sprint_id"]
+            isOneToOne: false
+            referencedRelation: "sprints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sprint_interrupts: {
+        Row: {
+          category_confirmation: Database["public"]["Enums"]["request_category"]
+          created_at: string
+          created_by: string
+          deprioritised_items: string
+          id: string
+          reason: string
+          request_id: string
+          sprint_id: string
+        }
+        Insert: {
+          category_confirmation: Database["public"]["Enums"]["request_category"]
+          created_at?: string
+          created_by: string
+          deprioritised_items: string
+          id?: string
+          reason: string
+          request_id: string
+          sprint_id: string
+        }
+        Update: {
+          category_confirmation?: Database["public"]["Enums"]["request_category"]
+          created_at?: string
+          created_by?: string
+          deprioritised_items?: string
+          id?: string
+          reason?: string
+          request_id?: string
+          sprint_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sprint_interrupts_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sprint_interrupts_sprint_id_fkey"
+            columns: ["sprint_id"]
+            isOneToOne: false
+            referencedRelation: "sprints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sprints: {
+        Row: {
+          created_at: string
+          created_by: string
+          end_date: string
+          id: string
+          name: string
+          start_date: string
+          status: Database["public"]["Enums"]["sprint_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          end_date: string
+          id?: string
+          name: string
+          start_date: string
+          status?: Database["public"]["Enums"]["sprint_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          end_date?: string
+          id?: string
+          name?: string
+          start_date?: string
+          status?: Database["public"]["Enums"]["sprint_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      triage_sessions: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          scheduled_date: string
+          status: Database["public"]["Enums"]["triage_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          scheduled_date: string
+          status?: Database["public"]["Enums"]["triage_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          scheduled_date?: string
+          status?: Database["public"]["Enums"]["triage_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_pm_or_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "pm" | "submitter" | "viewer"
+      request_category:
+        | "production_bug"
+        | "client_commitment"
+        | "usability_issue"
+        | "new_feature"
+        | "tech_enabler"
+      request_status:
+        | "intake"
+        | "classified"
+        | "in_triage"
+        | "sprint_candidate"
+        | "in_sprint"
+        | "done"
+        | "deferred"
+      request_urgency: "critical" | "high" | "medium" | "low"
+      sprint_status: "planning" | "active" | "completed"
+      triage_status: "scheduled" | "in_progress" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +439,27 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "pm", "submitter", "viewer"],
+      request_category: [
+        "production_bug",
+        "client_commitment",
+        "usability_issue",
+        "new_feature",
+        "tech_enabler",
+      ],
+      request_status: [
+        "intake",
+        "classified",
+        "in_triage",
+        "sprint_candidate",
+        "in_sprint",
+        "done",
+        "deferred",
+      ],
+      request_urgency: ["critical", "high", "medium", "low"],
+      sprint_status: ["planning", "active", "completed"],
+      triage_status: ["scheduled", "in_progress", "completed"],
+    },
   },
 } as const
