@@ -1,69 +1,131 @@
 
 
-# Client Request Triage Dashboard — Full v1 Build Plan
+# Role Renaming, Email Invitations & Smart Views
 
-A clean, minimal SaaS app for structured intake, classification, and triage of client requests. Email & password auth, role-based access (Submitter, PM, Viewer, Admin).
+## Overview
 
-## 1. Backend Setup (Lovable Cloud + Supabase)
+Three main changes: (1) rename the 3 visible roles to Admin / CSM Team / Product, (2) add an invite-users-by-email flow in Settings, (3) add universal filter bars + auto-generated contextual views per role.
 
-**Auth**: Email & password signup/login with protected routes.
+---
 
-**Database tables**:
-- `user_roles` — role-based access (admin, pm, submitter, viewer) using enum + security definer function
-- `requests` — all intake fields (title, description, source/customer, urgency, impact, workaround, size_estimate, request_type, status, category, date_received, submitter_id). Soft-delete only.
-- `sprint_interrupts` — interrupt reason, category confirmation, deprioritised items, created_by, timestamp
-- `triage_sessions` — scheduled date, status, notes
-- `audit_log` — who changed what, when (immutable)
-- `sprints` — sprint name, start/end dates, status
+## 1. Role Display Renaming (UI-only)
 
-**RLS policies**: Submitters can create & view own requests. PMs/Admins can classify, triage, and manage all. Viewers can read sprint candidates only.
+The DB keeps `admin`, `pm`, `submitter` enums unchanged. A new `ROLE_DISPLAY` map translates them:
 
-## 2. Pages & Navigation
+```text
+admin     → "Admin"
+pm        → "Product"
+submitter → "CSM Team"
+viewer    → (hidden from UI)
+```
 
-Clean sidebar navigation with role-aware menu items:
+**Files changed:**
+- `src/lib/constants.ts` — add `ROLE_DISPLAY` map
+- `src/pages/Settings.tsx` — use display names in role selector, hide "viewer"
+- `src/components/AppSidebar.tsx` — show role label under user name
+- `src/contexts/AuthContext.tsx` — add `isProduct` helper (alias for `isPmOrAdmin`)
 
-- **Dashboard** — summary stats: intake volume by category, sprint interrupt rate, triage cadence compliance charts
-- **Submit Request** — the intake form (mobile-friendly)
-- **Intake Queue** — list of all incoming requests with filters (status, urgency, category)
-- **Classification Panel** (PM/Admin only) — assign/override categories, bulk classify
-- **Triage Queue** — classified items awaiting triage, sorted by urgency
-- **Sprint Board** — Kanban or list view of sprint candidates and in-sprint items
-- **Interrupt Log** — visible to all, shows all sprint interrupts with trade-off records
-- **Settings** (Admin only) — manage categories, triage schedule, user roles
+**Access mapping stays the same:**
+- Admin → full access + Settings + invite users
+- Product (`pm` in DB) → Classification, Triage Queue, Sprint Board
+- CSM Team (`submitter` in DB) → Submit Request, view own requests
 
-## 3. Core Workflows
+---
 
-### Intake Form
-- All required fields from PRD (title, description, source, urgency, impact, workaround)
-- Optional: size estimate, request type (initial self-assessment)
-- Auto-captures date and submitter
-- Works fully on mobile
+## 2. Email Invitations
 
-### Classification (PM/Admin)
-- PM-only panel to assign category: 🔴 Production Bug, 🟠 Client Commitment, 🟡 Usability Issue, 🔵 New Feature, ⚙️ Tech Enabler
-- Bulk classify: select multiple → apply category
-- Override submitter's initial type assessment
+Admin can invite users by email from Settings. An edge function sends invite emails via Supabase Auth's `inviteUserByEmail` (using service role key). The invited user gets an email, clicks the link, sets their password, and lands in the app with the pre-assigned role.
 
-### Triage View
-- Shows classified, not-yet-triaged items sorted by urgency
-- PM promotes items to "Sprint Candidate" or parks/defers them
-- Status lifecycle: Intake → Classified → In Triage → Sprint Candidate → In Sprint → Done / Deferred
+**Database migration:**
+- Create `invitations` table: `id`, `email`, `role` (app_role), `invited_by` (uuid), `status` (pending/accepted), `created_at`
+- RLS: admins can insert/select, no public access
 
-### Sprint Interrupt Flow
-- "Interrupt" button on Sprint Candidate or Classified items (PM only)
-- Modal requires: reason, category confirmation (🔴/🟠/🟡 only), mandatory deprioritisation field
-- Deferred items surface prominently at next triage session
-- Interrupt log visible to all on sprint view
+**Edge function:** `supabase/functions/invite-user/index.ts`
+- Accepts `{ email, role, displayName? }`
+- Calls `supabase.auth.admin.inviteUserByEmail()`
+- Inserts row into `invitations` table
+- Supports bulk: accepts array of `{ email, role }` for mass invites
 
-## 4. Dashboard Analytics
-- Intake volume by category (bar/pie chart)
-- Sprint interrupt rate (target < 15%)
-- Triage cadence compliance tracker
-- Avg time from received → classified
+**UI in Settings:**
+- New "Invite Users" card with:
+  - Multi-row form: email + role selector per row, "Add another" button
+  - "Send Invitations" button
+  - Table of pending/accepted invitations below
 
-## 5. Design & UX
-- Clean, minimal aesthetic (Linear/Notion-inspired)
-- Light theme, ample whitespace
-- Color-coded category badges (🔴🟠🟡🔵⚙️)
-- Responsive: intake form fully functional on mobile, dashboard view-only acceptable on mobile
+**Post-signup trigger update:**
+- Update `handle_new_user` function to check `invitations` table for matching email and assign the invited role instead of default "submitter"
+
+---
+
+## 3. Universal Filter Bar Component
+
+Create a reusable `<RequestFilters>` component used across all list pages.
+
+**Filters available:**
+- Status (dropdown)
+- Urgency / Priority (dropdown)
+- Category (dropdown)
+- Customer / Source (searchable dropdown, populated from distinct `source_customer` values)
+
+**Files:**
+- `src/components/RequestFilters.tsx` — the reusable filter bar
+- Applied to: IntakeQueue, Classification, TriageQueue, SprintBoard
+
+---
+
+## 4. Smart Auto-Views (Tabs per role context)
+
+Instead of saved views, each page gets contextual tab views that auto-filter.
+
+### CSM Team views (IntakeQueue page):
+- **My Requests** tab — all requests submitted by current user
+- **By Status** — grouped/filtered by status to track progress
+- **By Customer** — filter by source_customer
+
+### Product views (Classification page):
+- **Unclassified** tab — requests in "intake" status (default)
+- **By Category** tabs — one tab per category (Bugs, Features, etc.) showing classified requests in that category
+- **All Classified** — everything that's been classified
+
+### Everyone views (SprintBoard):
+- **All Requests** — master view with all filters
+- **By Customer** — requests grouped by source_customer with status indicators
+- **In Progress** — requests currently in sprint
+
+**Implementation:** Tabs component at the top of each page, each tab sets filter presets on the shared `<RequestFilters>` component. No database table needed — views are computed from filters.
+
+---
+
+## Technical Details
+
+### Migration SQL
+```sql
+CREATE TABLE public.invitations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text NOT NULL,
+  role app_role NOT NULL DEFAULT 'submitter',
+  invited_by uuid NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.invitations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admins can manage invitations" ON public.invitations
+  FOR ALL TO authenticated
+  USING (has_role(auth.uid(), 'admin'))
+  WITH CHECK (has_role(auth.uid(), 'admin'));
+```
+
+### Updated handle_new_user trigger
+Check invitations table for matching email, use that role if found, otherwise default to 'submitter'. Mark invitation as 'accepted'.
+
+### Edge function: invite-user
+- Validates admin auth via JWT
+- Loops through array of invitees
+- Calls `supabase.auth.admin.inviteUserByEmail()` for each
+- Records in invitations table
+
+### Files created/modified
+- **New:** `src/components/RequestFilters.tsx`, `supabase/functions/invite-user/index.ts`
+- **Modified:** `src/lib/constants.ts`, `src/pages/Settings.tsx`, `src/pages/IntakeQueue.tsx`, `src/pages/Classification.tsx`, `src/pages/SprintBoard.tsx`, `src/pages/TriageQueue.tsx`, `src/components/AppSidebar.tsx`, `src/contexts/AuthContext.tsx`
+- **Migration:** invitations table + updated handle_new_user trigger
 
