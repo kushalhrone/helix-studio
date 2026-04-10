@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,8 @@ import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { useToast } from "@/hooks/use-toast";
 import { CATEGORY_CONFIG } from "@/lib/constants";
+import { RequestFilters, defaultFilters, applyFilters, type FilterValues } from "@/components/RequestFilters";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Enums } from "@/integrations/supabase/types";
 
 export default function Classification() {
@@ -18,6 +20,8 @@ export default function Classification() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkCategory, setBulkCategory] = useState<Enums<"request_category"> | "">("");
+  const [tab, setTab] = useState("unclassified");
+  const [filters, setFilters] = useState<FilterValues>({ ...defaultFilters, status: "all" });
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["requests-classify"],
@@ -32,6 +36,16 @@ export default function Classification() {
       return data;
     },
   });
+
+  const customers = useMemo(() => [...new Set(requests.map((r) => r.source_customer))].sort(), [requests]);
+
+  const tabFiltered = useMemo(() => {
+    if (tab === "unclassified") return requests.filter((r) => r.status === "intake");
+    if (tab === "all") return requests;
+    return requests.filter((r) => r.category === tab);
+  }, [requests, tab]);
+
+  const filtered = applyFilters(tabFiltered, filters);
 
   const classifyMutation = useMutation({
     mutationFn: async ({ ids, category }: { ids: string[]; category: Enums<"request_category"> }) => {
@@ -71,6 +85,18 @@ export default function Classification() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-foreground">Classification Panel</h1>
 
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="unclassified">Unclassified</TabsTrigger>
+          {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+            <TabsTrigger key={key} value={key}>{cfg.emoji} {cfg.label}</TabsTrigger>
+          ))}
+          <TabsTrigger value="all">All</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <RequestFilters filters={filters} onChange={setFilters} customers={customers} showStatus={false} />
+
       {selected.length > 0 && (
         <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
           <span className="text-sm font-medium">{selected.length} selected</span>
@@ -105,14 +131,14 @@ export default function Classification() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.length === 0 ? (
+              {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     No requests to classify
                   </TableCell>
                 </TableRow>
               ) : (
-                requests.map((r) => (
+                filtered.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>
                       <Checkbox checked={selected.includes(r.id)} onCheckedChange={() => toggleSelect(r.id)} />

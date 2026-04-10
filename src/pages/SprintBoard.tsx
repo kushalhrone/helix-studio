@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +14,8 @@ import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import { CATEGORY_CONFIG } from "@/lib/constants";
-import { format } from "date-fns";
+import { RequestFilters, defaultFilters, applyFilters, type FilterValues } from "@/components/RequestFilters";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Enums, Tables } from "@/integrations/supabase/types";
 
 export default function SprintBoard() {
@@ -25,6 +26,8 @@ export default function SprintBoard() {
   const [interruptModal, setInterruptModal] = useState<{ request: Tables<"requests">; sprintId: string } | null>(null);
   const [newSprint, setNewSprint] = useState({ name: "", start_date: "", end_date: "" });
   const [interruptForm, setInterruptForm] = useState({ reason: "", category_confirmation: "" as Enums<"request_category"> | "", deprioritised_items: "" });
+  const [tab, setTab] = useState("all");
+  const [filters, setFilters] = useState<FilterValues>(defaultFilters);
 
   const { data: sprints = [] } = useQuery({
     queryKey: ["sprints"],
@@ -47,6 +50,15 @@ export default function SprintBoard() {
       return data;
     },
   });
+
+  const customers = useMemo(() => [...new Set(requests.map((r) => r.source_customer))].sort(), [requests]);
+
+  const tabFiltered = useMemo(() => {
+    if (tab === "in-progress") return requests.filter((r) => r.status === "in_sprint");
+    return requests;
+  }, [requests, tab]);
+
+  const filtered = applyFilters(tabFiltered, filters);
 
   const createSprint = useMutation({
     mutationFn: async () => {
@@ -89,7 +101,6 @@ export default function SprintBoard() {
         created_by: user!.id,
       });
       if (error) throw error;
-      // Move request into sprint
       await supabase.from("requests").update({ sprint_id: interruptModal.sprintId, status: "in_sprint" as Enums<"request_status"> }).eq("id", interruptModal.request.id);
     },
     onSuccess: () => {
@@ -102,9 +113,20 @@ export default function SprintBoard() {
   });
 
   const activeSprint = sprints.find((s) => s.status === "active");
-  const sprintCandidates = requests.filter((r) => r.status === "sprint_candidate");
-  const inSprint = requests.filter((r) => r.status === "in_sprint");
-  const done = requests.filter((r) => r.status === "done");
+  const sprintCandidates = filtered.filter((r) => r.status === "sprint_candidate");
+  const inSprint = filtered.filter((r) => r.status === "in_sprint");
+  const done = filtered.filter((r) => r.status === "done");
+
+  // Group by customer for the "by-customer" tab
+  const customerGroups = useMemo(() => {
+    if (tab !== "by-customer") return {};
+    const groups: Record<string, typeof filtered> = {};
+    filtered.forEach((r) => {
+      if (!groups[r.source_customer]) groups[r.source_customer] = [];
+      groups[r.source_customer].push(r);
+    });
+    return groups;
+  }, [tab, filtered]);
 
   return (
     <div className="space-y-6">
@@ -114,6 +136,16 @@ export default function SprintBoard() {
           <Button onClick={() => setShowNewSprint(true)}>New Sprint</Button>
         )}
       </div>
+
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="all">All Requests</TabsTrigger>
+          <TabsTrigger value="by-customer">By Customer</TabsTrigger>
+          <TabsTrigger value="in-progress">In Progress</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <RequestFilters filters={filters} onChange={setFilters} customers={customers} showStatus={false} />
 
       {/* Sprint creation dialog */}
       <Dialog open={showNewSprint} onOpenChange={setShowNewSprint}>
@@ -182,63 +214,91 @@ export default function SprintBoard() {
         </DialogContent>
       </Dialog>
 
-      {/* Board columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Sprint Candidates ({sprintCandidates.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {sprintCandidates.map((r) => (
-              <div key={r.id} className="border rounded-lg p-3 space-y-2">
-                <p className="font-medium text-sm">{r.title}</p>
-                <div className="flex gap-2 flex-wrap">
-                  <UrgencyBadge urgency={r.urgency} />
-                  <CategoryBadge category={r.category} />
-                </div>
-                {isPmOrAdmin && activeSprint && (
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => moveToSprint.mutate({ requestId: r.id, sprintId: activeSprint.id })}>
-                      Add to Sprint
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setInterruptModal({ request: r, sprintId: activeSprint.id })}>
-                      Interrupt
-                    </Button>
+      {/* By Customer View */}
+      {tab === "by-customer" ? (
+        <div className="space-y-4">
+          {Object.entries(customerGroups).sort(([a], [b]) => a.localeCompare(b)).map(([customer, items]) => (
+            <Card key={customer}>
+              <CardHeader><CardTitle className="text-base">{customer} ({items.length})</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {items.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between border rounded-lg p-3">
+                    <div className="flex items-center gap-3">
+                      <p className="font-medium text-sm">{r.title}</p>
+                      <StatusBadge status={r.status} />
+                    </div>
+                    <div className="flex gap-2">
+                      <UrgencyBadge urgency={r.urgency} />
+                      <CategoryBadge category={r.category} />
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
-            {sprintCandidates.length === 0 && <p className="text-sm text-muted-foreground">No candidates</p>}
-          </CardContent>
-        </Card>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+          {Object.keys(customerGroups).length === 0 && (
+            <p className="text-muted-foreground text-center py-8">No requests found</p>
+          )}
+        </div>
+      ) : (
+        /* Board columns */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Sprint Candidates ({sprintCandidates.length})</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {sprintCandidates.map((r) => (
+                <div key={r.id} className="border rounded-lg p-3 space-y-2">
+                  <p className="font-medium text-sm">{r.title}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    <UrgencyBadge urgency={r.urgency} />
+                    <CategoryBadge category={r.category} />
+                  </div>
+                  {isPmOrAdmin && activeSprint && (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => moveToSprint.mutate({ requestId: r.id, sprintId: activeSprint.id })}>
+                        Add to Sprint
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setInterruptModal({ request: r, sprintId: activeSprint.id })}>
+                        Interrupt
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {sprintCandidates.length === 0 && <p className="text-sm text-muted-foreground">No candidates</p>}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">In Sprint ({inSprint.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {inSprint.map((r) => (
-              <div key={r.id} className="border rounded-lg p-3 space-y-2">
-                <p className="font-medium text-sm">{r.title}</p>
-                <div className="flex gap-2 flex-wrap">
-                  <UrgencyBadge urgency={r.urgency} />
+          <Card>
+            <CardHeader><CardTitle className="text-base">In Sprint ({inSprint.length})</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {inSprint.map((r) => (
+                <div key={r.id} className="border rounded-lg p-3 space-y-2">
+                  <p className="font-medium text-sm">{r.title}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    <UrgencyBadge urgency={r.urgency} />
+                    <CategoryBadge category={r.category} />
+                  </div>
+                </div>
+              ))}
+              {inSprint.length === 0 && <p className="text-sm text-muted-foreground">No items in sprint</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Done ({done.length})</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {done.map((r) => (
+                <div key={r.id} className="border rounded-lg p-3 space-y-2">
+                  <p className="font-medium text-sm">{r.title}</p>
                   <CategoryBadge category={r.category} />
                 </div>
-              </div>
-            ))}
-            {inSprint.length === 0 && <p className="text-sm text-muted-foreground">No items in sprint</p>}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Done ({done.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {done.map((r) => (
-              <div key={r.id} className="border rounded-lg p-3 space-y-2">
-                <p className="font-medium text-sm">{r.title}</p>
-                <CategoryBadge category={r.category} />
-              </div>
-            ))}
-            {done.length === 0 && <p className="text-sm text-muted-foreground">No completed items</p>}
-          </CardContent>
-        </Card>
-      </div>
+              ))}
+              {done.length === 0 && <p className="text-sm text-muted-foreground">No completed items</p>}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -5,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { useToast } from "@/hooks/use-toast";
+import { RequestFilters, defaultFilters, applyFilters, type FilterValues } from "@/components/RequestFilters";
 import type { Enums } from "@/integrations/supabase/types";
 
 export default function TriageQueue() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [filters, setFilters] = useState<FilterValues>({ ...defaultFilters });
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["requests-triage"],
@@ -21,11 +24,13 @@ export default function TriageQueue() {
         .in("status", ["classified", "in_triage"])
         .order("urgency", { ascending: true });
       if (error) throw error;
-      // Sort by urgency priority
       const urgencyOrder = { critical: 0, high: 1, medium: 2, low: 3 };
       return data.sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency]);
     },
   });
+
+  const customers = useMemo(() => [...new Set(requests.map((r) => r.source_customer))].sort(), [requests]);
+  const filtered = applyFilters(requests, { ...filters, status: "all" });
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: Enums<"request_status"> }) => {
@@ -43,6 +48,8 @@ export default function TriageQueue() {
       <h1 className="text-2xl font-semibold text-foreground">Triage Queue</h1>
       <p className="text-sm text-muted-foreground">Classified items awaiting triage. Promote to Sprint Candidate or defer.</p>
 
+      <RequestFilters filters={filters} onChange={setFilters} customers={customers} showStatus={false} />
+
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
       ) : (
@@ -59,14 +66,14 @@ export default function TriageQueue() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.length === 0 ? (
+              {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     No items in triage
                   </TableCell>
                 </TableRow>
               ) : (
-                requests.map((r) => (
+                filtered.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-medium max-w-[200px] truncate">{r.title}</TableCell>
                     <TableCell>{r.source_customer}</TableCell>
