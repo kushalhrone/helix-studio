@@ -13,6 +13,8 @@ interface AuthContextType {
   displayName: string | null;
   isPmOrAdmin: boolean;
   isAdmin: boolean;
+  isProduct: boolean;
+  isCsm: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -67,9 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isPmOrAdmin = roles.includes("admin") || roles.includes("pm");
   const isAdmin = roles.includes("admin");
+  const isProduct = roles.includes("pm");
+  const isCsm = roles.includes("submitter");
 
   return (
-    <AuthContext.Provider value={{ user, session, roles, loading, displayName, isPmOrAdmin, isAdmin, signOut }}>
+    <AuthContext.Provider value={{ user, session, roles, loading, displayName, isPmOrAdmin, isAdmin, isProduct, isCsm, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -24,3 +24,11 @@ export const STATUS_CONFIG: Record<Enums<"request_status">, { label: string }> =
   done: { label: "Done" },
   deferred: { label: "Deferred" },
 };
+
+export const ROLE_DISPLAY: Record<string, string> = {
+  admin: "Admin",
+  pm: "Product",
+  submitter: "CSM Team",
+};
+
+export const VISIBLE_ROLES = ["admin", "pm", "submitter"] as const;

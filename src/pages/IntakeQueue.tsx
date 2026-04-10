@@ -1,17 +1,19 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { StatusBadge } from "@/components/StatusBadge";
-import { useState } from "react";
+import { RequestFilters, defaultFilters, applyFilters, type FilterValues } from "@/components/RequestFilters";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import type { Enums } from "@/integrations/supabase/types";
 
 export default function IntakeQueue() {
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [urgencyFilter, setUrgencyFilter] = useState<string>("all");
+  const { user, isCsm } = useAuth();
+  const [filters, setFilters] = useState<FilterValues>(defaultFilters);
+  const [tab, setTab] = useState(isCsm ? "my-requests" : "all");
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["requests-intake"],
@@ -26,42 +28,28 @@ export default function IntakeQueue() {
     },
   });
 
-  const filtered = requests.filter((r) => {
-    if (statusFilter !== "all" && r.status !== statusFilter) return false;
-    if (urgencyFilter !== "all" && r.urgency !== urgencyFilter) return false;
-    return true;
-  });
+  const customers = useMemo(() => [...new Set(requests.map((r) => r.source_customer))].sort(), [requests]);
+
+  const tabFiltered = useMemo(() => {
+    let base = requests;
+    if (tab === "my-requests") base = base.filter((r) => r.submitter_id === user?.id);
+    return base;
+  }, [requests, tab, user?.id]);
+
+  const filtered = applyFilters(tabFiltered, filters);
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-foreground">Intake Queue</h1>
 
-      <div className="flex gap-3 flex-wrap">
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="intake">Intake</SelectItem>
-            <SelectItem value="classified">Classified</SelectItem>
-            <SelectItem value="in_triage">In Triage</SelectItem>
-            <SelectItem value="sprint_candidate">Sprint Candidate</SelectItem>
-            <SelectItem value="in_sprint">In Sprint</SelectItem>
-            <SelectItem value="done">Done</SelectItem>
-            <SelectItem value="deferred">Deferred</SelectItem>
-          </SelectContent>
-        </Select>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          {isCsm && <TabsTrigger value="my-requests">My Requests</TabsTrigger>}
+          <TabsTrigger value="all">All Requests</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Urgency" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Urgencies</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <RequestFilters filters={filters} onChange={setFilters} customers={customers} />
 
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>

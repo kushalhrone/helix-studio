@@ -4,6 +4,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { ROLE_DISPLAY } from "@/lib/constants";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
@@ -31,9 +32,11 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { isPmOrAdmin, isAdmin, displayName, signOut } = useAuth();
+  const { isPmOrAdmin, isAdmin, displayName, roles, signOut } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
+
+  const roleLabel = roles.map((r) => ROLE_DISPLAY[r] ?? r).filter(Boolean).join(", ");
 
   return (
     <Sidebar collapsible="icon">
@@ -42,6 +45,7 @@ export function AppSidebar() {
           <div className="px-4 py-4">
             <h1 className="text-lg font-semibold text-foreground">Triage</h1>
             <p className="text-xs text-muted-foreground truncate">{displayName}</p>
+            {roleLabel && <p className="text-xs text-muted-foreground/70 truncate">{roleLabel}</p>}
           </div>
         )}
 
