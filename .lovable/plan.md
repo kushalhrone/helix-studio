@@ -1,58 +1,36 @@
 
 
-# Role-Based Access Control — Strict Enforcement
+# User Management Page + Role Mapping
 
-Currently the sidebar shows most pages to all users, and route protection is inconsistent. This plan locks down navigation, routes, and page content per role.
+## Current State
+The Settings page (`/settings`) already contains both "Invite Users" and "User Role Management" cards. The role display mapping (`admin` → Admin, `pm` → Product, `submitter` → CSM Team) is already in `constants.ts`. The invite edge function and invitation table are working.
 
-## Role Access Matrix
-
-```text
-Page / Feature           Admin    Product (pm)    CSM Team (submitter)
-─────────────────────────────────────────────────────────────────────
-Dashboard                ✓ full   ✓ full          ✓ own requests only
-Submit Request           ✓        ✗               ✓
-Intake Queue             ✓        ✓ all           ✓ own requests only
-Classification           ✓        ✓               ✗
-Triage Queue             ✓        ✓               ✗
-Sprint Board             ✓        ✓               ✓ read-only
-Interrupt Log            ✓        ✓               ✓ read-only
-Settings (invite/roles)  ✓        ✗               ✗
-```
+## What This Plan Does
+Extract user management into a dedicated `/users` page with improved UX, keeping Settings for app config only.
 
 ## Changes
 
-### 1. Sidebar — Role-aware navigation
-- **CSM Team** sees: Dashboard, Submit Request, Intake Queue (own), Sprint Board (read-only), Interrupt Log (read-only)
-- **Product** sees: Dashboard, Intake Queue, Classification, Triage Queue, Sprint Board, Interrupt Log — no Submit Request
-- **Admin** sees everything
-- Each nav item gets a `roles` array; sidebar filters based on current user role
+### 1. New User Management Page (`src/pages/UserManagement.tsx`)
+- **Invite section** (top): Multi-row email + role form with bulk send — moved from Settings
+- **Active Users table**: Name, email, role badge, role change dropdown, last active date
+- **Pending Invitations table**: Email, assigned role, status (pending/accepted), sent date, resend button
+- Search/filter bar to find users by name or email
+- Admin-only access (same as Settings)
 
-### 2. Route protection in App.tsx
-- Add a generic `allowedRoles` prop to `ProtectedRoute` instead of just `requirePm`/`requireAdmin`
-- `/submit` — only `admin` and `submitter`
-- `/classify`, `/triage` — only `admin` and `pm`
-- `/settings` — only `admin`
-- `/sprints`, `/interrupts` — all authenticated (but UI restricts actions)
+### 2. Sidebar & Routing Updates
+- Add "User Management" nav item under Admin group (admin-only), with `Users` icon
+- Add `/users` route in `App.tsx` with `allowedRoles={["admin"]}`
+- Remove invite and role management cards from `Settings.tsx` (keep Settings for future app-level config)
 
-### 3. Dashboard — Role-aware content
-- **CSM Team**: Show only their own submitted requests summary (count by status, recent requests list). Hide charts that require all-requests data.
-- **Product / Admin**: Show full analytics dashboard as-is.
+### 3. Role Display Enhancements
+- Show role as colored badges: Admin (purple), Product (blue), CSM Team (green)
+- Role descriptions shown as tooltips: "Admin — Full access + user management", "Product — Classify & triage requests", "CSM Team — Submit & track requests"
 
-### 4. Sprint Board & Interrupt Log — Read-only for CSM
-- Hide "Create Sprint", "Add to Sprint", and interrupt action buttons when user is CSM (not `isPmOrAdmin`)
-- CSM can view sprint contents and interrupt history but cannot modify
+### 4. Resend Invitation
+- Add a "Resend" button on pending invitations that re-invokes the `invite-user` edge function for that email
 
-### 5. Intake Queue — CSM sees only own requests
-- Already handled by RLS (submitters can only SELECT their own requests), but reinforce in UI: remove "All Requests" tab for CSM users, default to "My Requests"
+## Files
+- **New:** `src/pages/UserManagement.tsx`
+- **Modified:** `src/App.tsx` (add route), `src/components/AppSidebar.tsx` (add nav item), `src/pages/Settings.tsx` (remove user cards)
 
-## Files Modified
-- `src/components/AppSidebar.tsx` — role-filtered nav items
-- `src/App.tsx` — updated `ProtectedRoute` with role arrays
-- `src/pages/Dashboard.tsx` — conditional content per role
-- `src/pages/SprintBoard.tsx` — hide mutation UI for CSM
-- `src/pages/InterruptLog.tsx` — hide create UI for CSM
-- `src/pages/IntakeQueue.tsx` — CSM defaults to own requests only
-- `src/contexts/AuthContext.tsx` — no changes needed (already has `isCsm`, `isProduct`, `isPmOrAdmin`)
-
-No database changes required — RLS already enforces data access correctly.
-
+No database changes needed.
