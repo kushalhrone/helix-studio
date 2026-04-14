@@ -11,9 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 
 export default function IntakeQueue() {
-  const { user, isCsm } = useAuth();
+  const { user, isCsm, isPmOrAdmin } = useAuth();
   const [filters, setFilters] = useState<FilterValues>(defaultFilters);
-  const { isPmOrAdmin } = useAuth();
   const csmOnly = isCsm && !isPmOrAdmin;
   const [tab, setTab] = useState(csmOnly ? "my-requests" : "all");
 
