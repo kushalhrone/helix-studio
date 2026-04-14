@@ -11,9 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 
 export default function IntakeQueue() {
-  const { user, isCsm } = useAuth();
+  const { user, isCsm, isPmOrAdmin } = useAuth();
   const [filters, setFilters] = useState<FilterValues>(defaultFilters);
-  const [tab, setTab] = useState(isCsm ? "my-requests" : "all");
+  const csmOnly = isCsm && !isPmOrAdmin;
+  const [tab, setTab] = useState(csmOnly ? "my-requests" : "all");
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["requests-intake"],
@@ -44,8 +45,8 @@ export default function IntakeQueue() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          {isCsm && <TabsTrigger value="my-requests">My Requests</TabsTrigger>}
-          <TabsTrigger value="all">All Requests</TabsTrigger>
+          {(isCsm || isPmOrAdmin) && <TabsTrigger value="my-requests">My Requests</TabsTrigger>}
+          {!csmOnly && <TabsTrigger value="all">All Requests</TabsTrigger>}
         </TabsList>
       </Tabs>
 

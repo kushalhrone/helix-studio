@@ -16,15 +16,17 @@ import SprintBoard from "@/pages/SprintBoard";
 import InterruptLog from "@/pages/InterruptLog";
 import SettingsPage from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
+import type { Enums } from "@/integrations/supabase/types";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children, requirePm, requireAdmin }: { children: React.ReactNode; requirePm?: boolean; requireAdmin?: boolean }) {
-  const { user, loading, isPmOrAdmin, isAdmin } = useAuth();
+type AppRole = Enums<"app_role">;
+
+function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: AppRole[] }) {
+  const { user, loading, roles } = useAuth();
   if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>;
   if (!user) return <Navigate to="/auth" replace />;
-  if (requireAdmin && !isAdmin) return <Navigate to="/" replace />;
-  if (requirePm && !isPmOrAdmin) return <Navigate to="/" replace />;
+  if (allowedRoles && !roles.some((r) => allowedRoles.includes(r))) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -47,13 +49,13 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/submit" element={<SubmitRequest />} />
+              <Route path="/submit" element={<ProtectedRoute allowedRoles={["admin", "submitter"]}><SubmitRequest /></ProtectedRoute>} />
               <Route path="/intake" element={<IntakeQueue />} />
-              <Route path="/classify" element={<ProtectedRoute requirePm><Classification /></ProtectedRoute>} />
-              <Route path="/triage" element={<ProtectedRoute requirePm><TriageQueue /></ProtectedRoute>} />
+              <Route path="/classify" element={<ProtectedRoute allowedRoles={["admin", "pm"]}><Classification /></ProtectedRoute>} />
+              <Route path="/triage" element={<ProtectedRoute allowedRoles={["admin", "pm"]}><TriageQueue /></ProtectedRoute>} />
               <Route path="/sprints" element={<SprintBoard />} />
               <Route path="/interrupts" element={<InterruptLog />} />
-              <Route path="/settings" element={<ProtectedRoute requireAdmin><SettingsPage /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute allowedRoles={["admin"]}><SettingsPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
