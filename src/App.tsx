@@ -15,6 +15,7 @@ import TriageQueue from "@/pages/TriageQueue";
 import SprintBoard from "@/pages/SprintBoard";
 import InterruptLog from "@/pages/InterruptLog";
 import SettingsPage from "@/pages/Settings";
+import UserManagement from "@/pages/UserManagement";
 import NotFound from "@/pages/NotFound";
 import type { Enums } from "@/integrations/supabase/types";
 
@@ -55,6 +56,7 @@ const App = () => (
               <Route path="/triage" element={<ProtectedRoute allowedRoles={["admin", "pm"]}><TriageQueue /></ProtectedRoute>} />
               <Route path="/sprints" element={<SprintBoard />} />
               <Route path="/interrupts" element={<InterruptLog />} />
+              <Route path="/users" element={<ProtectedRoute allowedRoles={["admin"]}><UserManagement /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute allowedRoles={["admin"]}><SettingsPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />

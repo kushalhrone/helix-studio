@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, PlusCircle, Inbox, Tags, Filter, Columns3, AlertTriangle, Settings, LogOut
+  LayoutDashboard, PlusCircle, Inbox, Tags, Filter, Columns3, AlertTriangle, Settings, LogOut, Users
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -42,6 +42,7 @@ const allItems: { group: string; items: NavItem[] }[] = [
   {
     group: "Admin",
     items: [
+      { title: "User Management", url: "/users", icon: Users, roles: ["admin"] },
       { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
     ],
   },
