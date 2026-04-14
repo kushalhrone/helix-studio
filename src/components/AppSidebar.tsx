@@ -5,36 +5,56 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_DISPLAY } from "@/lib/constants";
+import type { Enums } from "@/integrations/supabase/types";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
-const mainItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Submit Request", url: "/submit", icon: PlusCircle },
-  { title: "Intake Queue", url: "/intake", icon: Inbox },
-];
+type AppRole = Enums<"app_role">;
 
-const triageItems = [
-  { title: "Classification", url: "/classify", icon: Tags, pmOnly: true },
-  { title: "Triage Queue", url: "/triage", icon: Filter, pmOnly: true },
-  { title: "Sprint Board", url: "/sprints", icon: Columns3 },
-  { title: "Interrupt Log", url: "/interrupts", icon: AlertTriangle },
-];
+interface NavItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: AppRole[]; // which roles can see this item
+}
 
-const adminItems = [
-  { title: "Settings", url: "/settings", icon: Settings },
+const allItems: { group: string; items: NavItem[] }[] = [
+  {
+    group: "Main",
+    items: [
+      { title: "Dashboard", url: "/", icon: LayoutDashboard, roles: ["admin", "pm", "submitter"] },
+      { title: "Submit Request", url: "/submit", icon: PlusCircle, roles: ["admin", "submitter"] },
+      { title: "Intake Queue", url: "/intake", icon: Inbox, roles: ["admin", "pm", "submitter"] },
+    ],
+  },
+  {
+    group: "Triage & Sprints",
+    items: [
+      { title: "Classification", url: "/classify", icon: Tags, roles: ["admin", "pm"] },
+      { title: "Triage Queue", url: "/triage", icon: Filter, roles: ["admin", "pm"] },
+      { title: "Sprint Board", url: "/sprints", icon: Columns3, roles: ["admin", "pm", "submitter"] },
+      { title: "Interrupt Log", url: "/interrupts", icon: AlertTriangle, roles: ["admin", "pm", "submitter"] },
+    ],
+  },
+  {
+    group: "Admin",
+    items: [
+      { title: "Settings", url: "/settings", icon: Settings, roles: ["admin"] },
+    ],
+  },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { isPmOrAdmin, isAdmin, displayName, roles, signOut } = useAuth();
+  const { roles, displayName, signOut } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
+  const hasAccess = (allowedRoles: AppRole[]) => roles.some((r) => allowedRoles.includes(r));
 
   const roleLabel = roles.map((r) => ROLE_DISPLAY[r] ?? r).filter(Boolean).join(", ");
 
@@ -49,63 +69,29 @@ export function AppSidebar() {
           </div>
         )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Main</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Triage & Sprints</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {triageItems
-                .filter((item) => !item.pmOnly || isPmOrAdmin)
-                .map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <NavLink to={item.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
-                        <item.icon className="mr-2 h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {isAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Admin</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {adminItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <NavLink to={item.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
-                        <item.icon className="mr-2 h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        {allItems.map(({ group, items }) => {
+          const visible = items.filter((item) => hasAccess(item.roles));
+          if (visible.length === 0) return null;
+          return (
+            <SidebarGroup key={group}>
+              <SidebarGroupLabel>{group}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {visible.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                        <NavLink to={item.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
+                          <item.icon className="mr-2 h-4 w-4" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
 
       <SidebarFooter>
