@@ -41,9 +41,14 @@ export default function UserManagement() {
   const { data: users = [] } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*, user_roles(role)");
-      if (error) throw error;
-      return data;
+      const { data: profiles, error: profilesError } = await supabase.from("profiles").select("*");
+      if (profilesError) throw profilesError;
+      const { data: roles, error: rolesError } = await supabase.from("user_roles").select("user_id, role");
+      if (rolesError) throw rolesError;
+      return profiles.map((p) => ({
+        ...p,
+        user_roles: roles.filter((r) => r.user_id === p.user_id),
+      }));
     },
   });
 
