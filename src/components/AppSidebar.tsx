@@ -1,6 +1,7 @@
 import {
   LayoutDashboard, PlusCircle, Inbox, Tags, Filter, Columns3, AlertTriangle, Settings, LogOut, Users
 } from "lucide-react";
+import { HelixLogo } from "@/components/HelixLogo";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -64,8 +65,14 @@ export function AppSidebar() {
       <SidebarContent>
         {!collapsed && (
           <div className="px-4 py-4">
-            <h1 className="text-lg font-semibold text-foreground">Triage</h1>
-            <p className="text-xs text-muted-foreground truncate">{displayName}</p>
+            <div className="flex items-center gap-2">
+              <HelixLogo size={28} className="shrink-0" />
+              <div className="flex flex-col leading-none">
+                <h1 className="text-base font-bold text-foreground">Helix</h1>
+                <span className="text-[10px] text-muted-foreground/60">by Hrone Studio</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground truncate mt-1">{displayName}</p>
             {roleLabel && <p className="text-xs text-muted-foreground/70 truncate">{roleLabel}</p>}
           </div>
         )}

@@ -1,0 +1,74 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background: Mistral Black -->
+  <rect width="512" height="512" fill="#1f1f1f"/>
+
+  <defs>
+    <!-- Mistral gradient: yellow → amber → orange -->
+    <linearGradient id="g1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#ffd900"/>
+      <stop offset="45%"  stop-color="#ffa110"/>
+      <stop offset="100%" stop-color="#fa520f"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#ffd900"/>
+      <stop offset="45%"  stop-color="#ffa110"/>
+      <stop offset="100%" stop-color="#fa520f"/>
+    </linearGradient>
+
+    <!-- Clip: top half only (for front strand in top section) -->
+    <clipPath id="top-half">
+      <rect x="0" y="0" width="512" height="260"/>
+    </clipPath>
+    <!-- Clip: bottom half only (for front strand in bottom section) -->
+    <clipPath id="bot-half">
+      <rect x="0" y="252" width="512" height="260"/>
+    </clipPath>
+  </defs>
+
+  <!--
+    Double Helix — two S-curves crossing at y=256.
+    Strand A: left → right → left  (top-left → mid-right → bot-left)
+    Strand B: right → left → right (top-right → mid-left → bot-right)
+
+    Crossing logic:
+      • Top half:   Strand B is in FRONT of Strand A
+      • Bottom half: Strand A is in FRONT of Strand B
+  -->
+
+  <!-- === LAYER 1: Full Strand A (back in top, front in bottom) === -->
+  <path
+    d="M 162 82
+       C 162 162, 350 172, 350 256
+       C 350 340, 162 350, 162 430"
+    stroke="url(#g1)" stroke-width="60" fill="none" stroke-linecap="square"
+  />
+
+  <!-- === LAYER 2: Full Strand B (front in top half — drawn on top) === -->
+  <!-- Bottom half of B (dimmer — goes behind A at bottom) -->
+  <path
+    d="M 350 256
+       C 350 340, 162 350, 162 430"
+    stroke="url(#g2)" stroke-width="60" fill="none" stroke-linecap="square"
+    opacity="0.32"
+    clip-path="url(#bot-half)"
+  />
+
+  <!-- Top half of B (fully visible — crosses in front of A at top) -->
+  <path
+    d="M 350 82
+       C 350 162, 162 172, 162 256"
+    stroke="url(#g2)" stroke-width="60" fill="none" stroke-linecap="square"
+    clip-path="url(#top-half)"
+  />
+
+  <!-- === LAYER 3: Re-draw bottom of Strand A on top (front at bottom) === -->
+  <path
+    d="M 350 256
+       C 350 340, 162 350, 162 430"
+    stroke="url(#g1)" stroke-width="60" fill="none" stroke-linecap="square"
+    clip-path="url(#bot-half)"
+  />
+
+  <!-- Mistral gradient accent bar at bottom -->
+  <rect x="0" y="498" width="512" height="14" fill="url(#g1)"/>
+</svg>
